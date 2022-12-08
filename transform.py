@@ -1,17 +1,15 @@
-import pandas as pd
-
-nyt_url = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us.csv'
-jh_url_death = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv'
-jh_url_case = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv'
-
-nyt_df = pd.read_csv(nyt_url)
-jh_df_death = pd.read_csv(jh_url_death)
-jh_df_case = pd.read_csv(jh_url_case)
-
-print('Loading function')
+import extract
+from extract import pd
 
 
-def lambda_handler():
+nyt_df = extract.nyt_df
+jh_df_death = extract.jh_df_death
+jh_df_case = extract.jh_df_case
+
+def lambda_handler(event, context):
+    
+    global jh_df_us
+    global nyt_df
 
     # Renaming the columns to be properly capitalized 
     nyt_df.rename(columns={'date': 'Date', 'cases': 'Cases', 'deaths': 'Deaths'}, inplace = True)
@@ -41,6 +39,8 @@ def lambda_handler():
     print(jh_df_us, "John Hopkins Table")
 
 
-lambda_handler()
+lambda_handler("filler", "filler")
 
 print("done")
+print(nyt_df)
+print(jh_df_us)
