@@ -6,7 +6,7 @@ nyt_df = extract.nyt_df
 jh_df_death = extract.jh_df_death
 jh_df_case = extract.jh_df_case
 
-def lambda_handler(event, context):
+def lambda_h(event, context):
     
     global jh_df_us
     global nyt_df
@@ -39,7 +39,7 @@ def lambda_handler(event, context):
     print(jh_df_us, "John Hopkins Table")
 
 
-lambda_handler("filler", "filler")
+lambda_h("filler", "filler")
 
 print("done")
 print(nyt_df)
