@@ -1,8 +1,6 @@
 import psycopg2
 import transform
 from transform import lambda_h
-import json
-import os
 import boto3
 from extract import pd
 from sqlalchemy import create_engine
@@ -21,62 +19,72 @@ port = port['Parameter']['Value']
 username = username['Parameter']['Value']
 database = database['Parameter']['Value']
     
-    
-"""conn = psycopg2.connect(
-        host = host,
-        database = database,
-        user = username,
-        password = password
-)"""
-
 conn_string = f'postgresql://{username}:{password}@{host}/{database}'
 
-        
+db = create_engine(conn_string)
+conn_alch = db.connect()
+conn = psycopg2.connect(conn_string)
+cur = conn.cursor()
+
 def lambda_handler(event, context):
     
-    db = create_engine(conn_string)
-    conn_alch = db.connect()
     
-    conn = psycopg2.connect(conn_string)
-    cur = conn.cursor()
     
+    # Initially create tables and/or drop for testing purposes
+    # drop_table = '''DROP TABLE jh_df_us_table '''
+    # cur.execute(drop_table)
     # cur.execute("CREATE TABLE nyt_df_table (id serial PRIMARY KEY, Date DATE, Deaths INTEGER, Cases INTEGER);")
     # cur.execute("CREATE TABLE jh_df_us_table (id serial PRIMARY KEY, Date DATE, Deaths INTEGER, Cases INTEGER);")
+    # jh_df.to_sql('jh_df_us_table', con=conn_alch, if_exists='replace', index=False)
     
-    # sql11 = '''DROP TABLE nyt_df_table '''
-    # cur.execute(sql11)
+    # Reads current/old data
+    nyt_df_db = pd.read_sql_query('select * from "nyt_df_table"',con=conn_alch)
+    jh_df_db = pd.read_sql_query('select * from "jh_df_us_table"',con=conn_alch)
+    # print(nyt_df_db)
+    print(jh_df_db)
+    
+    # Inserts/replaces dataframe with two rows removed for testing purposes
+    # nyt_df_db = nyt_df_db.drop(nyt_df_db.tail(2).index)
+    jh_df_db = jh_df_db.drop(jh_df_db.tail(2).index)
+    # print(nyt_df_db.tail())
+    # nyt_df_db.to_sql('nyt_df_table', con=conn_alch, if_exists='replace', index=False)
+    jh_df_db.to_sql('jh_df_us_table', con=conn_alch, if_exists='replace', index=False)
+    print(jh_df_db.tail())
+    print(jh_df_db.info())
+
     
     
-    #cur = conn.cursor()
-    
-    
-    
+    # Grabs fresh data
     lambda_h(event, context)
     nyt_df = transform.nyt_df
-    jh_df_us = transform.jh_df_us
-
+    jh_df = transform.jh_df_us
+    
+    # jh_df.to_sql('jh_df_us_table', con=conn_alch, if_exists='replace', index=False)
+    # conn.commit()
+    
+    
+    # Compare rows
+    nyt_merged = nyt_df_db.merge(nyt_df, indicator = True, how = 'outer')
+    jh_merged = jh_df_db.merge(jh_df, indicator = True, how = 'outer')
+    print(jh_merged)
+    print(jh_merged.info())
+    
+    # creates df with only the new rows then appends to dataframe in DB
+    nyt_new_data = nyt_merged.loc[lambda x: x['_merge'] != 'both']
+    nyt_new_data = nyt_new_data.drop(['_merge'], axis=1)
+    jh_new_data = jh_merged.loc[lambda x: x['_merge'] != 'both']
+    jh_new_data = jh_new_data.drop(['_merge'], axis=1)
+    print(jh_new_data)
+    print(jh_new_data.info())
+    
+    # Appends new data to db
+    nyt_new_data.to_sql('nyt_df_table', con=conn_alch, if_exists='append', index=False)
+    jh_new_data.to_sql('jh_df_us_table', con=conn_alch, if_exists='append', index=False)
+       
+   
+    nyt_df_db = pd.read_sql_query('select * from "nyt_df_table"',con=conn_alch)
+    jh_df_db = pd.read_sql_query('select * from "jh_df_us_table"',con=conn_alch)
+    print(jh_df_db.tail())
         
-    
-    
-    
-    nyt_df.to_sql('nyt_df_table', con=conn_alch, if_exists='replace')
-    # jh_df_us.to_sql('jh_df_us_table', con=conn, if_exists='replace')
-    
-    # conn = psycopg2.connect(conn_string)
-    
-    conn.autocommit = True
-    
-    
-    
-    sql1 = '''select * from nyt_df_table;'''
-    cur.execute(sql1)
-    for i in cur.fetchall():
-        print(i)
-    
-    
-    conn.commit()
-    #cur.execute("SELECT * FROM nyt_df_table;")
-    #print(cur.fetchall())
-        
-    
     conn.close()
+    conn_alch.close()
