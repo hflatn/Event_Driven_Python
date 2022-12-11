@@ -1,10 +1,11 @@
-import psycopg2
 import transform
 from transform import lambda_h
+from notification import notify
+import psycopg2
 import boto3
+import json
 from extract import pd
 from sqlalchemy import create_engine
-
 
 client = boto3.client('ssm')
 endpoint = client.get_parameter(Name='Event_Driven_RDS_Endpoint')
@@ -29,7 +30,6 @@ cur = conn.cursor()
 def lambda_handler(event, context):
     
     
-    
     # Initially create tables and/or drop for testing purposes
     # drop_table = '''DROP TABLE jh_df_us_table '''
     # cur.execute(drop_table)
@@ -41,7 +41,8 @@ def lambda_handler(event, context):
     nyt_df_db = pd.read_sql_query('select * from "nyt_df_table"',con=conn_alch)
     jh_df_db = pd.read_sql_query('select * from "jh_df_us_table"',con=conn_alch)
     # print(nyt_df_db)
-    print(jh_df_db)
+    # print(jh_df_db)
+    
     
     # Inserts/replaces dataframe with two rows removed for testing purposes
     # nyt_df_db = nyt_df_db.drop(nyt_df_db.tail(2).index)
@@ -49,25 +50,21 @@ def lambda_handler(event, context):
     # print(nyt_df_db.tail())
     # nyt_df_db.to_sql('nyt_df_table', con=conn_alch, if_exists='replace', index=False)
     jh_df_db.to_sql('jh_df_us_table', con=conn_alch, if_exists='replace', index=False)
-    print(jh_df_db.tail())
-    print(jh_df_db.info())
-
+    # print(jh_df_db.tail())
+    # print(jh_df_db.info())
     
     
     # Grabs fresh data
     lambda_h(event, context)
     nyt_df = transform.nyt_df
     jh_df = transform.jh_df_us
+
     
-    # jh_df.to_sql('jh_df_us_table', con=conn_alch, if_exists='replace', index=False)
-    # conn.commit()
-    
-    
-    # Compare rows
+    # Compares old with new data
     nyt_merged = nyt_df_db.merge(nyt_df, indicator = True, how = 'outer')
     jh_merged = jh_df_db.merge(jh_df, indicator = True, how = 'outer')
-    print(jh_merged)
-    print(jh_merged.info())
+    # print(jh_merged)
+    # print(jh_merged.info())
     
     # creates df with only the new rows then appends to dataframe in DB
     nyt_new_data = nyt_merged.loc[lambda x: x['_merge'] != 'both']
@@ -81,10 +78,13 @@ def lambda_handler(event, context):
     nyt_new_data.to_sql('nyt_df_table', con=conn_alch, if_exists='append', index=False)
     jh_new_data.to_sql('jh_df_us_table', con=conn_alch, if_exists='append', index=False)
        
-   
+    # Checkign to make sure the db has been update
     nyt_df_db = pd.read_sql_query('select * from "nyt_df_table"',con=conn_alch)
     jh_df_db = pd.read_sql_query('select * from "jh_df_us_table"',con=conn_alch)
-    print(jh_df_db.tail())
+    # print(jh_df_db.tail())
+    
+    # Publishes updated row to subscribers of topic
+    notify(nyt_new_data, jh_new_data)
         
     conn.close()
     conn_alch.close()
