@@ -11,10 +11,7 @@ def notify(nyt_df, jh_df):
     nyt_df_json = nyt_df.to_json()
     jh_df_json = jh_df.to_json()
     
-    print(jh_df_json)
-    print(nyt_df.shape[0])
-    # print(os.environ[target_arn])
-    
+
     message = {
         "New York Times Database Number of Rows Added": nyt_df.shape[0],
         'New York Times Database Rows Added': nyt_df_json,

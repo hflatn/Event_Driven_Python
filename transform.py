@@ -1,12 +1,11 @@
 import extract
 from extract import pd
 
-
 nyt_df = extract.nyt_df
 jh_df_death = extract.jh_df_death
 jh_df_case = extract.jh_df_case
 
-def lambda_h(event, context):
+def transform_data():
     
     global jh_df_us
     global nyt_df
@@ -33,14 +32,7 @@ def lambda_h(event, context):
     nyt_df["Date"] = pd.to_datetime(nyt_df["Date"])
     jh_df_us["Date"] = pd.to_datetime(jh_df_us["Date"])
 
-    
-
-    print(nyt_df, "NYT Table")
-    print(jh_df_us, "John Hopkins Table")
-
-
-lambda_h("filler", "filler")
+    nyt_df.name = 'nyt_df_table'
+    jh_df_us.name = 'jh_df_table'
 
 print("done")
-print(nyt_df)
-print(jh_df_us)
